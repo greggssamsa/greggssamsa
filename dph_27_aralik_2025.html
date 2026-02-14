@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Pediatrik Sıvı + Elektrolit + Glukoz Karışım Hesaplayıcı</title>
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    body { margin: 0; background:#f6f7fb; color:#111; }
+    .wrap { max-width: 980px; margin: 24px auto; padding: 0 16px; }
+    .card { background:#fff; border-radius: 14px; box-shadow: 0 6px 24px rgba(0,0,0,.08); padding: 18px; }
+    h1 { font-size: 18px; margin: 0 0 12px; }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 720px){ .grid{ grid-template-columns: 1fr; } }
+    label { display:block; font-size: 13px; color:#333; margin-bottom: 6px; }
+    input, select { width:100%; padding: 10px 12px; border:1px solid #d7dbe7; border-radius: 10px; font-size: 14px; background:#fff; }
+    button { width:100%; padding: 11px 12px; border:0; border-radius: 10px; font-size: 15px; background:#1b66ff; color:#fff; cursor:pointer; }
+    button:active { transform: translateY(1px); }
+    .muted { color:#666; font-size: 12px; line-height: 1.35; }
+    pre { margin: 0; white-space: pre-wrap; word-break: break-word; background:#0b1020; color:#e8eeff;
+          padding: 14px; border-radius: 12px; overflow:auto; font-size: 13px; line-height: 1.35; }
+    .err { background:#fff0f0; border:1px solid #ffd0d0; color:#7a0000; padding: 10px 12px; border-radius: 12px; }
+    .ok  { background:#f0fff4; border:1px solid #c7f5d4; color:#0b5b2a; padding: 10px 12px; border-radius: 12px; }
+    .pill { display:inline-block; padding: 3px 8px; border-radius: 999px; background:#eef3ff; color:#1647b8; font-size: 12px; }
+    .hint { font-size:12px; color:#555; margin-top:6px; }
+    .row2 { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .girBox { display:grid; grid-template-columns: 1fr; gap: 8px; }
+    .girBtns { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .btnSmall { padding: 10px 12px; font-size: 14px; border-radius: 10px; }
+    .btnGhost { background:#eef3ff; color:#1647b8; border:1px solid #d7dbe7; }
+    .btnGhost:active { transform: translateY(1px); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>🧮 Pediatrik Günlük Sıvı + Elektrolit + Glukoz Karışım Hesaplayıcı</h1>
+
+      <div class="muted">
+        Hedefler: Na 145 mEq/L (Serum Sale 3.4 mEq/mL), K 20 mEq/L (%7.5 KCl 1 mEq/mL),
+        GIR hedefi <b>1–9</b> mg/kg/dk (varsayılan hedef: 5).
+        BSA formülü: <span class="pill">[(4×kg)+7] / (90+kg)</span>
+      </div>
+
+      <div style="height:12px"></div>
+
+      <div class="grid">
+        <div>
+          <label>Hastanın kilosu (kg)</label>
+          <input id="kg" inputmode="decimal" placeholder="örn. 3.2 / 12 / 33" />
+        </div>
+
+        <div>
+          <label>GIR hedefi (mg/kg/dk) — opsiyonel</label>
+          <div class="girBox">
+            <input id="gir" inputmode="decimal" placeholder="varsayılan 5.0" />
+            <div class="girBtns">
+              <button id="btnGirDown" class="btnSmall btnGhost" type="button">−1 GIR</button>
+              <button id="btnGirUpHalf" class="btnSmall btnGhost" type="button">+0,5 GIR</button>
+            </div>
+          </div>
+          <div class="hint">Butonlar sadece GIR hedefini değiştirir; sıvı hedefin (mL/m²/gün) aynı kalır. Sonuç otomatik hesaplanır.</div>
+        </div>
+
+        <div>
+          <label>&gt;10 kg için sıvı hedefi (mL/m²/gün)</label>
+          <select id="fluidM2">
+            <option value="1500" selected>1500 mL/m²/gün</option>
+            <option value="2000">2000 mL/m²/gün</option>
+            <option value="2500">2500 mL/m²/gün</option>
+          </select>
+          <div class="hint">Kilo ≤10 kg ise bu seçim kullanılmaz; mL/kg/gün hedefleri otomatik kullanılır.</div>
+        </div>
+
+        <div>
+          <label>≤10 kg için otomatik mL/kg/gün hedef seti</label>
+          <select id="fluidKg" disabled>
+            <option selected>40–120 mL/kg/gün (otomatik seçim)</option>
+          </select>
+        </div>
+
+        <div>
+          <label>Glukoz derişim bandı (seç / özelleştir)</label>
+          <select id="glucosePreset">
+            <option value="12-12.5" selected>%12 – %12.5</option>
+            <option value="11-12">%11 – %12</option>
+            <option value="10-11">%10 – %11</option>
+            <option value="10-12.5">%10 – %12.5</option>
+            <option value="custom">Özel (aşağıdan gir)</option>
+          </select>
+          <div class="hint">Not: %10 = 100 g/L, %12.5 = 125 g/L (g/L = % × 10).</div>
+        </div>
+
+        <div>
+          <label>Özel band (% min / % max)</label>
+          <div class="row2">
+            <input id="gMinPct" inputmode="decimal" placeholder="örn 10" disabled />
+            <input id="gMaxPct" inputmode="decimal" placeholder="örn 12.5" disabled />
+          </div>
+          <div class="hint">Preset “Özel” seçilince aktif olur.</div>
+        </div>
+      </div>
+
+      <div style="height:12px"></div>
+
+      <button id="btn" type="button">Hesapla</button>
+
+      <div style="height:14px"></div>
+
+      <div id="msg"></div>
+
+      <div style="height:10px"></div>
+
+      <pre id="out">Sonuç burada görünecek…</pre>
+
+      <div style="height:10px"></div>
+
+      <div class="muted">
+        Uyarı: Bu araç eğitim amaçlıdır; kurum protokolü / hasta kliniği / lab &amp; böbrek fonksiyonlarına göre uyarlayın.
+      </div>
+    </div>
+  </div>
+
+<script>
+/** ===== Helpers ===== **/
+function roundMl(x){ return Math.round(x * 10) / 10; }
+function roundTo(x, digits){
+  const p = Math.pow(10, digits);
+  return Math.round(x * p) / p;
+}
+function bsaFromWeight(weightKg){
+  return ((4.0 * weightKg) + 7.0) / (90.0 + weightKg);
+}
+function girFrom(conc_g_per_L, total_vol_L, weightKg){
+  const total_glucose_g = conc_g_per_L * total_vol_L;
+  return (total_glucose_g * 1000.0) / (weightKg * 1440.0);
+}
+function pctToGL(pct){ return pct * 10.0; } // % -> g/L
+function parseNumberTR(s){
+  const t = String(s ?? "").trim().replace(",", ".");
+  if (!t) return NaN;
+  return Number(t);
+}
+function setGirValue(n){
+  const v = Math.max(0.1, n);
+  // 0.5 hassasiyette güzel dursun
+  const rounded = Math.round(v * 2) / 2;
+  document.getElementById("gir").value = String(rounded).replace(".", ","); // TR görünüm
+}
+
+function getGlucoseBandGL(){
+  const preset = document.getElementById("glucosePreset").value;
+
+  if (preset !== "custom"){
+    const parts = preset.split("-").map(x => Number(x));
+    const minPct = parts[0], maxPct = parts[1];
+    return { minPct, maxPct, minGL: pctToGL(minPct), maxGL: pctToGL(maxPct) };
+  }
+
+  const minPct = parseNumberTR(document.getElementById("gMinPct").value);
+  const maxPct = parseNumberTR(document.getElementById("gMaxPct").value);
+
+  if (!Number.isFinite(minPct) || !Number.isFinite(maxPct)) {
+    throw new Error("Özel glukoz bandı için % min ve % max değerlerini gir.");
+  }
+  if (!(minPct > 0 && maxPct > 0)) throw new Error("Glukoz % değerleri pozitif olmalı.");
+  if (!(maxPct > minPct)) throw new Error("Glukoz bandında % max, % min'den büyük olmalı.");
+  if (minPct < 2 || maxPct > 25) throw new Error("Glukoz bandı mantıksız görünüyor (öneri: %2–%25 içinde).");
+
+  return { minPct, maxPct, minGL: pctToGL(minPct), maxGL: pctToGL(maxPct) };
+}
+
+/**
+ * Returns: { totalVolMl, concGL, fluidBasis, fluidTargetValue, fluidTargetText, glucoseBandText, glucoseBandMinGL, glucoseBandMaxGL }
+ */
+function chooseFluidAndGlucose(weightKg, girTarget, eps, selectedM2Target, bandMinGL, bandMaxGL, bandText){
+  if (!(weightKg > 0)) throw new Error("Kilogram > 0 olmalı.");
+
+  const bsa = bsaFromWeight(weightKg);
+
+  const concMin = bandMinGL + eps;
+  const concMax = bandMaxGL - eps;
+  if (!(concMax > concMin)) throw new Error("Glukoz bandı çok dar/ters görünüyor. Min < Max olmalı.");
+
+  // ≤10 kg: otomatik mL/kg/gün
+  if (weightKg <= 10.0){
+    const candidatesKg = [40, 50, 60, 70, 80, 90, 100, 110, 120];
+    const preferred = 100.0;
+    const feasible = []; // [obj, totalVolMl, concPick, girPick, target]
+
+    for (const target of candidatesKg){
+      const totalVolMl = target * weightKg;
+      const totalVolL = totalVolMl / 1000.0;
+
+      const girLow  = girFrom(concMin, totalVolL, weightKg);
+      const girHigh = girFrom(concMax, totalVolL, weightKg);
+
+      // GIR bandı 1–9
+      if (girHigh <= 1.0 || girLow >= 9.0) continue;
+
+      const concReq = (girTarget * weightKg * 1440.0 / 1000.0) / totalVolL;
+      let concPick = Math.min(Math.max(concReq, concMin), concMax);
+      let girPick = girFrom(concPick, totalVolL, weightKg);
+
+      if (!(girPick > 1.0 && girPick < 9.0)){
+        for (const g of [5.0, 7.0, 3.0, 8.5, 1.5, 8.9, 1.1]){
+          const concTry = (g * weightKg * 1440.0 / 1000.0) / totalVolL;
+          if (concTry > concMin && concTry < concMax){
+            concPick = concTry;
+            girPick = girFrom(concPick, totalVolL, weightKg);
+            break;
+          }
+        }
+      }
+
+      if (girPick > 1.0 && girPick < 9.0){
+        const obj = Math.abs(girPick - girTarget) * 1000.0 + Math.abs(target - preferred);
+        feasible.push([obj, totalVolMl, concPick, girPick, target]);
+      }
+    }
+
+    if (feasible.length === 0){
+      throw new Error(`≤10 kg için: mL/kg/gün hedefleriyle seçilen glukoz bandında (${bandText}) GIR 1–9 sağlanamadı.`);
+    }
+
+    feasible.sort((a,b)=>a[0]-b[0]);
+    const best = feasible[0];
+    const totalVolMl = best[1];
+    const concGL = best[2];
+
+    const fluidTargetValue = totalVolMl / weightKg;
+    const fluidTargetText = `${Math.round(fluidTargetValue)} mL/kg/gün`;
+
+    return {
+      totalVolMl, concGL,
+      fluidBasis: "kg",
+      fluidTargetValue, fluidTargetText,
+      glucoseBandText: bandText,
+      glucoseBandMinGL: bandMinGL,
+      glucoseBandMaxGL: bandMaxGL
+    };
+  }
+
+  // >10 kg: hacim sabit (BSA*mL/m²/gün)
+  const targetM2 = Number(selectedM2Target);
+  if (![1500,2000,2500].includes(targetM2)){
+    throw new Error(">10 kg için sıvı hedefi 1500/2000/2500 olmalı.");
+  }
+
+  const totalVolMl = targetM2 * bsa;
+  const totalVolL  = totalVolMl / 1000.0;
+
+  const girLow  = girFrom(concMin, totalVolL, weightKg);
+  const girHigh = girFrom(concMax, totalVolL, weightKg);
+
+  if (girHigh <= 1.0 || girLow >= 9.0){
+    throw new Error(`Seçilen ${targetM2} mL/m²/gün ve glukoz bandı (${bandText}) ile GIR 1–9 aralığına girilemiyor.`);
+  }
+
+  const concReq = (girTarget * weightKg * 1440.0 / 1000.0) / totalVolL;
+  let concPick = Math.min(Math.max(concReq, concMin), concMax);
+  let girPick = girFrom(concPick, totalVolL, weightKg);
+
+  if (!(girPick > 1.0 && girPick < 9.0)){
+    for (const g of [5.0, 7.0, 3.0, 8.5, 1.5, 8.9, 1.1]){
+      const concTry = (g * weightKg * 1440.0 / 1000.0) / totalVolL;
+      if (concTry > concMin && concTry < concMax){
+        concPick = concTry;
+        girPick = girFrom(concPick, totalVolL, weightKg);
+        break;
+      }
+    }
+  }
+
+  if (!(girPick > 1.0 && girPick < 9.0)){
+    throw new Error(`Seçilen ${targetM2} mL/m²/gün ile GIR hedefi, glukoz bandı (${bandText}) içinde sağlanamadı.`);
+  }
+
+  return {
+    totalVolMl, concGL: concPick,
+    fluidBasis: "m2",
+    fluidTargetValue: targetM2,
+    fluidTargetText: `${targetM2} mL/m²/gün`,
+    glucoseBandText: bandText,
+    glucoseBandMinGL: bandMinGL,
+    glucoseBandMaxGL: bandMaxGL
+  };
+}
+
+/** compute_plan */
+function computePlan(weightKg, girTarget, selectedM2Target, band){
+  if (!(weightKg > 0)) throw new Error("Kilogram > 0 olmalı.");
+
+  const bsa = bsaFromWeight(weightKg);
+
+  const chosen = chooseFluidAndGlucose(
+    weightKg,
+    girTarget,
+    0.01,
+    selectedM2Target,
+    band.minGL,
+    band.maxGL,
+    `%${band.minPct} – %${band.maxPct}`
+  );
+
+  const totalVolMl = chosen.totalVolMl;
+  const concGL = chosen.concGL;
+  const totalVolL = totalVolMl / 1000.0;
+
+  const totalGlucoseG = concGL * totalVolL;
+  const gir = (totalGlucoseG * 1000.0) / (weightKg * 1440.0);
+
+  // Electrolytes
+  const naTarget = 145.0;
+  const kTarget = 20.0;
+  const naSource = 3.4; // mEq/mL
+  const kSource = 1.0;  // mEq/mL
+
+  const naNeeded = naTarget * totalVolL;
+  const kNeeded  = kTarget  * totalVolL;
+
+  const volSerumSaleMl = naNeeded / naSource;
+  const volKclMl       = kNeeded  / kSource;
+
+  const remainingMl = totalVolMl - volSerumSaleMl - volKclMl;
+  if (!(remainingMl > 0)) throw new Error("Dextroz için kalan hacim negatif/0 çıktı; girdileri kontrol edin.");
+
+  // Dextrose mix
+  const c20 = 200.0, c10 = 100.0, c5 = 50.0; // g/L
+  const VdL = remainingMl / 1000.0;
+  const Gg = totalGlucoseG;
+
+  let xL = (Gg - c5 * VdL) / (c20 - c5); // D20
+  let zL = VdL - xL;                     // D5
+  let yL = 0.0;                          // D10
+
+  const clamp0 = (v)=> (v < 1e-6 ? 0.0 : v);
+  xL = clamp0(xL);
+  zL = clamp0(zL);
+
+  let Gcheck = c20*xL + c10*yL + c5*zL;
+  if (Math.abs(Gcheck - Gg) > 0.5){
+    const delta = Gg - Gcheck;
+    yL = delta / c10;
+    zL = Math.max(0.0, zL - yL);
+    Gcheck = c20*xL + c10*yL + c5*zL;
+  }
+
+  const rateMlH = totalVolMl / 24.0;
+
+  return {
+    vol_d20_ml: roundMl(xL * 1000.0),
+    vol_d5_ml:  roundMl(zL * 1000.0),
+    vol_d10_ml: roundMl(yL * 1000.0),
+    vol_serum_sale_ml: roundMl(volSerumSaleMl),
+    vol_kcl_7_5_ml: roundMl(volKclMl),
+
+    bsa_m2: roundTo(bsa, 3),
+    total_volume_ml: roundMl(totalVolMl),
+    rate_ml_per_h: roundMl(rateMlH),
+
+    fluid_basis: chosen.fluidBasis,
+    fluid_target_value: Math.round(chosen.fluidTargetValue),
+    fluid_target_text: chosen.fluidTargetText,
+
+    gir_mg_kg_min: roundTo(gir, 3),
+    total_glucose_g: roundTo(totalGlucoseG, 2),
+    glucose_conc_g_per_L: roundTo(concGL, 2),
+
+    glucose_band_text: chosen.glucoseBandText,
+    glucose_band_gL_text: `${roundTo(chosen.glucoseBandMinGL,1)}–${roundTo(chosen.glucoseBandMaxGL,1)} g/L`
+  };
+}
+
+/** UI glue */
+function fmtPlan(p){
+  const lines = [];
+  lines.push(`${p.vol_d20_ml} mL %20 dekstroz`);
+  lines.push(`${p.vol_d5_ml} mL %5 dekstroz`);
+  lines.push(`${p.vol_d10_ml} mL %10 dekstroz`);
+  lines.push(`${p.vol_serum_sale_ml} mL Serum Sale`);
+  lines.push(`${p.vol_kcl_7_5_ml} mL %7,5 KCl`);
+  lines.push("");
+  lines.push(`Hastanın hesaplanan vücut yüzey alanı = ${p.bsa_m2} m²`);
+  lines.push(`Seçilen sıvı hedefi = ${p.fluid_target_text}`);
+  if (p.fluid_basis === "m2"){
+    lines.push(`BSA ve sıvı hedefi: ${p.fluid_target_value} mL/m²/gün`);
+  } else {
+    lines.push(`Sıvı hedefi: ${p.fluid_target_value} mL/kg/gün`);
+  }
+  lines.push(`Sıvı hızı = ${p.rate_ml_per_h} mL/saat`);
+  lines.push(`Günlük toplam hacim = ${p.total_volume_ml} mL`);
+  lines.push("");
+  lines.push(`Glukoz bandı = ${p.glucose_band_text}  (${p.glucose_band_gL_text})`);
+  lines.push(`Seçilen glukoz derişimi = ${p.glucose_conc_g_per_L} g/L`);
+  lines.push(`Dekstroz perfüzyon hızı (GIR) = ${p.gir_mg_kg_min} mg/kg/dk  (hedef: 1–9)`);
+  lines.push(`Toplam glukoz miktarı = ${p.total_glucose_g} gram/gün`);
+  return lines.join("\n");
+}
+
+function syncFluidUI(){
+  const kg = parseNumberTR(document.getElementById("kg").value);
+  const fluidM2 = document.getElementById("fluidM2");
+  if (Number.isFinite(kg) && kg > 0 && kg <= 10){
+    fluidM2.disabled = true;
+  } else {
+    fluidM2.disabled = false;
+  }
+}
+
+function syncGlucoseUI(){
+  const preset = document.getElementById("glucosePreset").value;
+  const minEl = document.getElementById("gMinPct");
+  const maxEl = document.getElementById("gMaxPct");
+  const isCustom = preset === "custom";
+  minEl.disabled = !isCustom;
+  maxEl.disabled = !isCustom;
+
+  if (!isCustom){
+    const parts = preset.split("-").map(Number);
+    minEl.value = String(parts[0]).replace(".", ",");
+    maxEl.value = String(parts[1]).replace(".", ",");
+  } else {
+    if (!minEl.value) minEl.value = "10";
+    if (!maxEl.value) maxEl.value = "12,5";
+  }
+}
+
+function runCalc(){
+  const msg = document.getElementById("msg");
+  const out = document.getElementById("out");
+  msg.innerHTML = "";
+  out.textContent = "";
+
+  try{
+    const kg = parseNumberTR(document.getElementById("kg").value);
+    const girStr = document.getElementById("gir").value;
+    const girTarget = girStr.trim() ? parseNumberTR(girStr) : 5.0;
+    const selectedM2 = Number(document.getElementById("fluidM2").value);
+
+    if (!Number.isFinite(kg) || kg <= 0) throw new Error("Geçerli bir kilo (kg) gir.");
+    if (!Number.isFinite(girTarget) || girTarget <= 0) throw new Error("Geçerli bir GIR hedefi gir (örn 5).");
+
+    const band = getGlucoseBandGL();
+    const plan = computePlan(kg, girTarget, selectedM2, band);
+
+    msg.innerHTML = `<div class="ok"><b>OK:</b> Hesaplandı.</div>`;
+    out.textContent = fmtPlan(plan);
+  } catch(e){
+    msg.innerHTML = `<div class="err"><b>Hata:</b> ${String(e.message || e)}</div>`;
+    out.textContent = "—";
+  }
+}
+
+/** Events */
+document.getElementById("kg").addEventListener("input", syncFluidUI);
+document.getElementById("glucosePreset").addEventListener("change", ()=>{ syncGlucoseUI(); runCalc(); });
+document.getElementById("fluidM2").addEventListener("change", runCalc);
+
+document.getElementById("btn").addEventListener("click", runCalc);
+
+// GIR butonları
+document.getElementById("btnGirDown").addEventListener("click", ()=>{
+  const current = parseNumberTR(document.getElementById("gir").value);
+  const v = Number.isFinite(current) ? current : 5.0;
+  setGirValue(v - 1.0);
+  runCalc();
+});
+
+document.getElementById("btnGirUpHalf").addEventListener("click", ()=>{
+  const current = parseNumberTR(document.getElementById("gir").value);
+  const v = Number.isFinite(current) ? current : 5.0;
+  setGirValue(v + 0.5);
+  runCalc();
+});
+
+// Enter ile hesapla
+["kg","gir","gMinPct","gMaxPct"].forEach(id=>{
+  document.getElementById(id).addEventListener("keydown", (e)=>{ if(e.key==="Enter") runCalc(); });
+});
+
+// İlk durum
+syncFluidUI();
+syncGlucoseUI();
+setGirValue(5.0);
+</script>
+</body>
+</html>

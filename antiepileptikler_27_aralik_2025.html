@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Antiepileptik Doz Hesaplayıcı</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #f6f7fb; }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 16px; }
+    .card { background: #fff; border-radius: 14px; padding: 16px; box-shadow: 0 6px 20px rgba(0,0,0,.06); }
+    h1 { font-size: 20px; margin: 0 0 12px; }
+    .row { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    @media (min-width: 800px) { .row { grid-template-columns: 1fr 1fr; } }
+    label { display:block; font-weight: 650; margin: 8px 0 6px; }
+    input, button { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #d9dce5; font-size: 16px; }
+    button { border: 0; background: #1f6feb; color: #fff; font-weight: 750; cursor: pointer; margin-top: 8px; }
+    button:active { transform: translateY(1px); }
+    .muted { color: #667085; font-size: 13px; margin-top: 6px; line-height: 1.35; }
+    .error { margin-top: 12px; padding: 10px; background: #fff1f1; border: 1px solid #ffd1d1; border-radius: 12px; color: #b42318; }
+    .out { margin-top: 14px; padding: 12px; background: #f2f6ff; border: 1px solid #d7e3ff; border-radius: 12px; }
+    .pill { display:inline-block; padding: 4px 10px; border-radius: 999px; background:#eef2ff; border:1px solid #d7e3ff; font-size: 13px; margin-right: 8px; }
+    .hr { height: 1px; background: #e8ecf5; margin: 12px 0; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    ul { margin: 6px 0 0 18px; }
+    .route { background:#fff; border:1px solid #e7ebf4; border-radius: 12px; padding: 12px; margin-top: 10px; }
+    .route h3 { margin: 0 0 8px; font-size: 16px; }
+    .kv { margin: 4px 0; }
+    .kv b { display:inline-block; min-width: 160px; }
+    .small { font-size: 13px; color:#475467; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Antiepileptik Doz Hesaplayıcı</h1>
+
+      <div class="row">
+        <div>
+          <label for="kilo">Kilo (kg)</label>
+          <input id="kilo" inputmode="decimal" placeholder="Örn: 18.5" />
+          <div class="muted">Virgül veya nokta kabul edilir.</div>
+        </div>
+
+        <div>
+          <label for="ilac">İlaç adı</label>
+          <input id="ilac" placeholder="Örn: dormicum, diazem, keppra, luminal, epanutin, topamax, depakin, rivotril..." />
+          <div class="muted">
+            Eşleşme: Türkçe karakterler normalize edilir (ç→c, ğ→g, ı→i...).<br/>
+            İstersen marka/alias yazabilirsin.
+          </div>
+        </div>
+      </div>
+
+      <button id="btn">Hesapla</button>
+
+      <div id="err" class="error" style="display:none;"></div>
+      <div id="out" class="out" style="display:none;"></div>
+
+      <div class="muted" style="margin-top:12px;">
+        <span class="pill">Offline</span>
+        <span class="pill">Tek dosya</span>
+        <span class="pill">Android/PC</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function norm(s) {
+      s = (s ?? "").toLowerCase().trim();
+      const map = { "ç":"c", "ğ":"g", "ı":"i", "ö":"o", "ş":"s", "ü":"u" };
+      s = s.replace(/[çğıöşü]/g, ch => map[ch] || ch);
+      s = s.replace(/\s+/g, " ");
+      return s;
+    }
+
+    // --- TR format helpers (virgül) ---
+    function toTR(nStr) { return String(nStr).replace(".", ","); }
+
+    function fmtPlain(x, decimals) {
+      if (!Number.isFinite(x)) return "—";
+      return toTR(x.toFixed(decimals));
+    }
+
+    // Genel sayı (birim yok)
+    function fmtNum(x) {
+      if (!Number.isFinite(x)) return "—";
+      if (Math.abs(x) < 1) return fmtPlain(x, 5);     // 0,00083 gibi değerler için
+      if (Math.abs(x) < 10) return fmtPlain(x, 2);
+      return fmtPlain(x, 1);
+    }
+
+    // Sadece mg, ama <1 mg ise 3-6 basamak
+    function fmtMgOnly(mg) {
+      if (!Number.isFinite(mg)) return "—";
+      const abs = Math.abs(mg);
+      if (abs < 0.001) return `${fmtPlain(mg, 6)} mg`;
+      if (abs < 1) return `${fmtPlain(mg, 3)} mg`;
+      if (abs < 10) return `${fmtPlain(mg, 2)} mg`;
+      return `${fmtPlain(mg, 1)} mg`;
+    }
+
+    // mg + µg birlikte
+    function fmtMgWithUg(mg) {
+      if (!Number.isFinite(mg)) return "—";
+      const ug = mg * 1000; // 1 mg = 1000 µg
+      const ugStr = (Math.abs(ug) < 10) ? fmtPlain(ug, 2)
+                  : (Math.abs(ug) < 100) ? fmtPlain(ug, 1)
+                  : fmtPlain(ug, 0);
+      return `${fmtMgOnly(mg)} (${ugStr} µg)`;
+    }
+
+    function parseWeight(raw) {
+      const v = (raw ?? "").trim().replace(",", ".");
+      const w = Number(v);
+      if (!Number.isFinite(w) || w <= 0) return null;
+      return w;
+    }
+
+    const DB = [
+      {
+        name: "Midazolam",
+        aliases: ["midazolam", "dormicum"],
+        resp_depression_risk: "VAR",
+        serious_adverse_effects: [
+          "Solunum depresyonu/apne",
+          "Hipotansiyon (özellikle hızlı IV/diğer sedatiflerle)",
+          "Aşırı sedasyon"
+        ],
+        routes: [
+          { route:"IV", dose_mg_per_kg:0.10, max_single_dose_mg:4, iv_admin_minutes:[2,3], repeat_after_min:5, max_repeats:2, notes:"Yavaş IV. SpO2/solunum monitorizasyon." },
+          { route:"IM", dose_mg_per_kg:0.20, max_single_dose_mg:10, repeat_after_min:10, max_repeats:1, notes:"IV yoksa pratik seçenek." },
+          { route:"PR (Rektal)", dose_mg_per_kg:0.30, max_single_dose_mg:10, repeat_after_min:10, max_repeats:1, notes:"Emilim değişken olabilir." }
+        ],
+        maintenance: {
+          infusion: { rate_mg_per_kg_per_hr:[0.05,0.20], notes:"Yoğun bakım/refrakter status. Sıklıkla entübasyon gerekebilir." },
+          notes: "İnfüzyon dozu mg/kg/saat olarak verilir."
+        }
+      },
+
+      {
+        name: "Diazepam",
+        aliases: ["diazepam", "diazem", "diazemul"],
+        resp_depression_risk: "VAR",
+        serious_adverse_effects: [
+          "Solunum depresyonu/apne",
+          "Hipotansiyon (özellikle hızlı IV)",
+          "Kısa etki süresi (redistribüsyon) → tekrar nöbet"
+        ],
+        routes: [
+          { route:"IV", min_dose_mg_per_kg:0.15, max_dose_mg_per_kg:0.20, max_single_dose_mg:10, iv_admin_minutes:[2,2], repeat_after_min:5, max_repeats:1, notes:"Yavaş IV." },
+          { route:"IM", notes:"IM genelde önerilmez (emilim düzensiz)." },
+          { route:"PR (Rektal)", min_dose_mg_per_kg:0.30, max_dose_mg_per_kg:0.50, max_single_dose_mg:10, repeat_after_min:10, max_repeats:1, notes:"10–15 dk sonra 1 kez tekrar." }
+        ]
+      },
+
+      {
+        name: "Levetirasetam",
+        aliases: ["levetirasetam", "levetiracetam", "keppra"],
+        resp_depression_risk: "YOK",
+        serious_adverse_effects: [
+          "Ajitasyon/irritabilite",
+          "Somnolans (genelde hafif)",
+          "Nadir: ciddi döküntü/hipersensitivite"
+        ],
+        routes: [
+          { route:"IV (Yükleme)", min_dose_mg_per_kg:20, max_dose_mg_per_kg:60, iv_admin_minutes:[10,15], notes:"Tek yükleme dozu. Hemodinami genelde stabil." }
+        ],
+        maintenance: {
+          per_dose_mg_per_kg:[20,30],
+          frequency_per_day: 2,
+          total_mg_per_kg_per_day:[40,60],
+          max_daily_dose_mg: 3000,
+          notes:"IV veya PO; genelde 12 saatte 1."
+        }
+      },
+
+      {
+        name: "Fenobarbital",
+        aliases: ["fenobarbital", "phenobarbital", "luminal"],
+        resp_depression_risk: "YÜKSEK",
+        serious_adverse_effects: [
+          "Belirgin solunum depresyonu/apne",
+          "Hipotansiyon (özellikle hızlı yükleme)",
+          "Uzamış sedasyon"
+        ],
+        routes: [
+          { route:"IV (Yükleme)", min_dose_mg_per_kg:15, max_dose_mg_per_kg:20, iv_max_rate_mg_per_kg_per_min:[0.0,1.0], notes:"Monitorizasyon (TA/EKG/SpO2)." },
+          { route:"PO (Yükleme - alternatif)", min_dose_mg_per_kg:15, max_dose_mg_per_kg:20, notes:"Bölünmüş doz verilebilir; acilde IV tercih." }
+        ],
+        maintenance: {
+          per_dose_mg_per_kg:[3,5],
+          frequency_per_day: 1,
+          total_mg_per_kg_per_day:[3,5],
+          notes:"Günlük 3–5 mg/kg/gün (tek doz veya 2’ye bölünebilir)."
+        }
+      },
+
+      {
+        name: "Fenitoin",
+        aliases: ["fenitoin", "phenytoin", "epanutin", "dilantin"],
+        resp_depression_risk: "YOK",
+        serious_adverse_effects: [
+          "Aritmi/iletim bozukluğu",
+          "Hipotansiyon (hızlı IV)",
+          "Ekstravazasyon (purple glove), doku hasarı"
+        ],
+        routes: [
+          { route:"IV (Yükleme)", dose_mg_per_kg:20, iv_max_rate_mg_per_kg_per_min:[0.0,1.0], notes:"EKG + TA monitorizasyon." },
+          { route:"PO (Yükleme)", min_dose_mg_per_kg:15, max_dose_mg_per_kg:20, notes:"2–3 doza bölerek." }
+        ],
+        maintenance: {
+          per_dose_mg_per_kg:[2,3],
+          frequency_per_day: 2,
+          total_mg_per_kg_per_day:[4,6],
+          notes:"Pratikte 2–3 doza bölünebilir; düzey takibi gerekebilir (10–20 µg/mL)."
+        }
+      },
+
+      {
+        name: "Topiramat",
+        aliases: ["topiramat", "topiramate", "topamax"],
+        resp_depression_risk: "YOK",
+        serious_adverse_effects: [
+          "Metabolik asidoz",
+          "Böbrek taşı",
+          "Kognitif yavaşlama",
+          "İştah kaybı/kilo kaybı"
+        ],
+        routes: [
+          { route:"PO (İdame)", notes:"Rutin yükleme yok. Status için IV form standardize değil." }
+        ],
+        maintenance: {
+          per_dose_mg_per_kg:[2.5,4.5],
+          frequency_per_day: 2,
+          total_mg_per_kg_per_day:[5,9],
+          max_daily_dose_mg: 400,
+          notes:"Başlangıç 0.5–1 mg/kg/gün; haftada 0.5–1 mg/kg artır; hedef 5–9 mg/kg/gün (2 doza böl)."
+        }
+      },
+
+      {
+        name: "Valproat (Sodyum valproat / Valproik asit)",
+        aliases: ["valproat", "valproate", "sodyum valproat", "valproik asit", "valproic acid", "depakin", "depakine"],
+        resp_depression_risk: "YOK",
+        serious_adverse_effects: [
+          "Hepatotoksisite (özellikle küçük yaş)",
+          "Hiperamonyemi/ensefalopati",
+          "Pankreatit (nadir ama ciddi)"
+        ],
+        routes: [
+          { route:"IV (Yükleme)", min_dose_mg_per_kg:20, max_dose_mg_per_kg:30, iv_admin_minutes:[10,15], iv_max_rate_mg_per_kg_per_min:[3,6], notes:"Genelde 10–15 dk’da verilir; hız ≤3–6 mg/kg/dk." },
+          { route:"PO (Yükleme)", min_dose_mg_per_kg:20, max_dose_mg_per_kg:30, notes:"Duruma göre; status’ta IV tercih." }
+        ],
+        maintenance: {
+          total_mg_per_kg_per_day:[20,60],
+          per_dose_mg_per_kg:[10,30],
+          frequency_per_day: 2,
+          notes:"20–60 mg/kg/gün; 2–3 doza böl. Sık: ~30 mg/kg/gün. Kontrendike: <2 yaş + metabolik hastalık şüphesi, KC yetm., üre siklusu defekti."
+        }
+      },
+
+      {
+        name: "Klonazepam",
+        aliases: ["klonazepam", "clonazepam", "rivotril"],
+        resp_depression_risk: "VAR",
+        serious_adverse_effects: [
+          "Sedasyon",
+          "Tolerans/bağımlılık",
+          "Solunum depresyonu (özellikle diğer sedatiflerle)"
+        ],
+        routes: [
+          { route:"PO (Başlangıç dozu)", notes:"Kilo <30 kg: 0.01–0.03 mg/kg/gün. Kilo ≥30 kg: başlangıç dozu 0.05 mg/kg/gün'ü geçmemeli." }
+        ],
+        maintenance: {
+          total_mg_per_kg_per_day:[0.05,0.2],
+          per_dose_mg_per_kg:[0.017,0.067],
+          frequency_per_day: 3,
+          max_daily_dose_mg: 6,
+          notes:"Başlangıç sonrası hedef 0.05–0.2 mg/kg/gün; maks 0.2 mg/kg/gün veya 6 mg/gün; 2–3 doza böl."
+        }
+      },
+
+      {
+        name: "Karbamazepin",
+        aliases: ["karbamazepin", "carbamazepine", "tegretol", "finlepsin"],
+        resp_depression_risk: "YOK",
+        serious_adverse_effects: [
+          "Hiponatremi (SIADH)",
+          "Aplastik anemi/agranülositoz (nadir)",
+          "Absans/myoklonik nöbeti kötüleştirebilir"
+        ],
+        routes: [
+          { route:"PO (İdame)", notes:"Rutin yükleme yok; acil status tedavisinde tercih edilmez." }
+        ],
+        maintenance: {
+          total_mg_per_kg_per_day:[10,20],
+          per_dose_mg_per_kg:[5,10],
+          frequency_per_day: 2,
+          notes:"Başlangıç 5 mg/kg/gün; hedef 10–20 mg/kg/gün (2–3 doza böl). Serum hedefi 4–12 µg/mL. Enzim indükleyici."
+        }
+      },
+
+      {
+        name: "Klobazam",
+        aliases: ["klobazam", "clobazam", "frisium", "urbanyl"],
+        resp_depression_risk: "VAR",
+        serious_adverse_effects: [
+          "Sedasyon (genelde diğer BZD’lere göre daha az)",
+          "Tolerans/bağımlılık",
+          "Solunum depresyonu (özellikle diğer sedatiflerle)"
+        ],
+        routes: [
+          { route:"PO (İdame)", notes:"Lennox–Gastaut / add-on tedavi." }
+        ],
+        maintenance: {
+          total_mg_per_kg_per_day:[0.3,1.0],
+          per_dose_mg_per_kg:[0.15,0.5],
+          frequency_per_day: 2,
+          max_daily_dose_mg: 40,
+          notes:"Başlangıç 0.1 mg/kg/gün; hedef 0.3–1 mg/kg/gün; maks 40 mg/gün; 1–2 doza böl."
+        }
+      }
+    ];
+
+    const LOOKUP = new Map();
+    for (const d of DB) for (const a of [...d.aliases, d.name]) LOOKUP.set(norm(a), d);
+
+    function calcRouteDoseMg(weight, r) {
+      if (r.dose_mg_per_kg != null) {
+        let mg = weight * r.dose_mg_per_kg;
+        if (r.max_single_dose_mg != null) mg = Math.min(mg, r.max_single_dose_mg);
+        return { low: mg, high: null };
+      }
+      if (r.min_dose_mg_per_kg != null && r.max_dose_mg_per_kg != null) {
+        let low = weight * r.min_dose_mg_per_kg;
+        let high = weight * r.max_dose_mg_per_kg;
+        if (r.max_single_dose_mg != null) { low = Math.min(low, r.max_single_dose_mg); high = Math.min(high, r.max_single_dose_mg); }
+        return { low, high };
+      }
+      return { low: null, high: null };
+    }
+
+    function clonazepamStartHtml(weight) {
+      if (weight < 30) {
+        const mn = 0.01, mx = 0.03;
+        return `<div class="kv"><b>Başlangıç dozu:</b> ${fmtMgWithUg(weight*mn)} – ${fmtMgWithUg(weight*mx)} (${fmtNum(mn)}–${fmtNum(mx)} mg/kg/gün)</div>`;
+      } else {
+        const cap = 0.05;
+        return `<div class="kv"><b>Başlangıç dozu:</b> ≤ ${fmtMgWithUg(weight*cap)} (≤ ${fmtNum(cap)} mg/kg/gün; kilo ≥30 kg kuralı)</div>`;
+      }
+    }
+
+    function maintenanceHtml(weight, m) {
+      let html = `<div class="hr"></div><div class="route"><h3>İDAME / MAKSİMUM GÜNLÜK DOZ</h3>`;
+
+      if (m.infusion) {
+        const [rmin, rmax] = m.infusion.rate_mg_per_kg_per_hr;
+        const rmin_per_min = rmin / 60.0;
+        const rmax_per_min = rmax / 60.0;
+
+        html += `
+          <div class="kv"><b>İnfüzyon hızı:</b> ${fmtNum(rmin)}–${fmtNum(rmax)} mg/kg/saat (${fmtNum(rmin*1000)}–${fmtNum(rmax*1000)} µg/kg/saat)</div>
+          <div class="kv"><b>İnfüzyon hızı (dk):</b> ${fmtNum(rmin_per_min)}–${fmtNum(rmax_per_min)} mg/kg/dk (${fmtNum(rmin_per_min*1000)}–${fmtNum(rmax_per_min*1000)} µg/kg/dk)</div>
+
+          <div class="hr"></div>
+          <div class="kv"><b>Kilo karşılığı:</b> ${fmtMgWithUg(weight*rmin)} – ${fmtMgWithUg(weight*rmax)} /saat</div>
+          <div class="kv"><b>Kilo karşılığı (dk):</b> ${fmtMgWithUg(weight*rmin_per_min)} – ${fmtMgWithUg(weight*rmax_per_min)} /dk</div>
+          <div class="kv"><b>Gün eşdeğeri:</b> ${fmtMgWithUg(weight*rmin*24)} – ${fmtMgWithUg(weight*rmax*24)} /gün</div>
+        `;
+        if (m.infusion.notes) html += `<div class="kv small"><b>Not:</b> ${m.infusion.notes}</div>`;
+      }
+
+      if (m.per_dose_mg_per_kg && m.frequency_per_day && m.frequency_per_day > 0) {
+        const f = m.frequency_per_day;
+        const [pmin, pmax] = m.per_dose_mg_per_kg;
+        const perMin = weight * pmin;
+        const perMax = weight * pmax;
+        const totMin = perMin * f;
+        const totMax = perMax * f;
+
+        html += `<div class="kv"><b>Sıklık:</b> günde ${f} doz</div>`;
+
+        if (Math.abs(pmin - pmax) < 1e-12) {
+          html += `<div class="kv"><b>Doz:</b> ${f} * ${fmtMgWithUg(perMin)} (${fmtNum(pmin)} mg/kg/doz; toplam ${fmtMgWithUg(totMin)} = ${fmtNum(pmin*f)} mg/kg/gün)</div>`;
+        } else {
+          html += `<div class="kv"><b>Doz aralığı:</b> ${f} * ${fmtMgWithUg(perMin)} – ${fmtMgWithUg(perMax)}
+            (${fmtNum(pmin)}–${fmtNum(pmax)} mg/kg/doz; toplam ${fmtMgWithUg(totMin)}–${fmtMgWithUg(totMax)} = ${fmtNum(pmin*f)}–${fmtNum(pmax*f)} mg/kg/gün)</div>`;
+        }
+      }
+
+      if (m.total_mg_per_kg_per_day) {
+        const [dmin, dmax] = m.total_mg_per_kg_per_day;
+        const tmin = weight * dmin;
+        const tmax = weight * dmax;
+
+        if (Math.abs(dmin - dmax) < 1e-12) {
+          html += `<div class="kv"><b>Referans günlük aralık:</b> ${fmtMgWithUg(tmin)} = ${fmtNum(dmin)} mg/kg/gün</div>`;
+        } else {
+          html += `<div class="kv"><b>Referans günlük aralık:</b> ${fmtMgWithUg(tmin)}–${fmtMgWithUg(tmax)} = ${fmtNum(dmin)}–${fmtNum(dmax)} mg/kg/gün</div>`;
+        }
+      }
+
+      if (m.max_daily_dose_mg != null) html += `<div class="kv"><b>Maksimum günlük doz:</b> ${m.max_daily_dose_mg} mg</div>`;
+      if (m.notes) html += `<div class="kv small"><b>Not:</b> ${m.notes}</div>`;
+
+      html += `</div>`;
+      return html;
+    }
+
+    function renderPlan(weight, drug) {
+      let html = `
+        <div>
+          <div class="pill"><b>İlaç:</b> ${drug.name}</div>
+          <div class="pill"><b>Kilo:</b> ${toTR(weight)} kg</div>
+          <div class="pill"><b>Solunum baskısı riski:</b> ${drug.resp_depression_risk}</div>
+        </div>
+
+        <div class="hr"></div>
+
+        <div class="kv"><b>Ciddi yan etkiler:</b></div>
+        <ul>${drug.serious_adverse_effects.map(x => `<li>${x}</li>`).join("")}</ul>
+
+        <div class="hr"></div>
+        <div class="mono small">— Uygulama yolları —</div>
+      `;
+
+      for (const r of drug.routes) {
+        html += `<div class="route"><h3>Uygulama yolu: ${r.route}</h3>`;
+
+        if (norm(drug.name) === norm("Klonazepam") && norm(r.route) === norm("PO (Başlangıç dozu)")) {
+          html += clonazepamStartHtml(weight);
+          if (r.notes) html += `<div class="kv small"><b>Not:</b> ${r.notes}</div>`;
+          html += `</div>`;
+          continue;
+        }
+
+        const { low, high } = calcRouteDoseMg(weight, r);
+
+        if (low != null) {
+          if (high == null) {
+            if (r.dose_mg_per_kg != null) {
+              html += `<div class="kv"><b>Doz:</b> ${fmtMgWithUg(low)} (${fmtNum(r.dose_mg_per_kg)} mg/kg)</div>`;
+            } else {
+              html += `<div class="kv"><b>Doz:</b> ${fmtMgWithUg(low)}</div>`;
+            }
+          } else {
+            html += `<div class="kv"><b>Doz:</b> ${fmtMgWithUg(low)} – ${fmtMgWithUg(high)} (${fmtNum(r.min_dose_mg_per_kg)}–${fmtNum(r.max_dose_mg_per_kg)} mg/kg)</div>`;
+          }
+        } else {
+          html += `<div class="kv small"><b>Doz:</b> (Bu yol için mg/kg tanımı yok)</div>`;
+        }
+
+        if (r.max_single_dose_mg != null) html += `<div class="kv"><b>Tek doz maksimum:</b> ${r.max_single_dose_mg} mg</div>`;
+
+        if (r.iv_admin_minutes) {
+          const [a,b] = r.iv_admin_minutes;
+          html += `<div class="kv"><b>IV süresi:</b> ${a === b ? `${a} dk` : `${a}–${b} dk`}</div>`;
+        }
+
+        if (r.iv_max_rate_mg_per_kg_per_min) {
+          const [vmin, vmax] = r.iv_max_rate_mg_per_kg_per_min;
+          const line = (vmin <= 0)
+            ? `≤ ${fmtNum(vmax)} mg/kg/dk (≤ ${fmtNum(vmax*1000)} µg/kg/dk)`
+            : `${fmtNum(vmin)}–${fmtNum(vmax)} mg/kg/dk (${fmtNum(vmin*1000)}–${fmtNum(vmax*1000)} µg/kg/dk)`;
+          html += `<div class="kv"><b>Maks hız:</b> ${line}</div>`;
+        }
+
+        if (r.repeat_after_min != null) {
+          let rep = `${r.repeat_after_min} dk sonra`;
+          if (r.max_repeats != null) rep += `, max ${r.max_repeats} kez`;
+          html += `<div class="kv"><b>Tekrar:</b> ${rep}</div>`;
+        }
+
+        if (r.notes) html += `<div class="kv small"><b>Not:</b> ${r.notes}</div>`;
+
+        html += `</div>`;
+      }
+
+      if (drug.maintenance) html += maintenanceHtml(weight, drug.maintenance);
+      return html;
+    }
+
+    const kiloEl = document.getElementById("kilo");
+    const ilacEl = document.getElementById("ilac");
+    const btn = document.getElementById("btn");
+    const errEl = document.getElementById("err");
+    const outEl = document.getElementById("out");
+
+    function showErr(msg) { errEl.textContent = msg; errEl.style.display = "block"; outEl.style.display = "none"; }
+    function clearErr() { errEl.textContent = ""; errEl.style.display = "none"; }
+
+    function run() {
+      clearErr();
+      const w = parseWeight(kiloEl.value);
+      if (w == null) return showErr("Hata: Kilo sayı olmalı ve >0 olmalı.");
+
+      const q = norm(ilacEl.value);
+      if (!q) return showErr("Hata: İlaç adı gir.");
+
+      const drug = LOOKUP.get(q);
+      if (!drug) {
+        return showErr("İlaç bulunamadı. Örnekler: dormicum, diazem, keppra, luminal, epanutin, topamax, depakin, rivotril, tegretol, frisium");
+      }
+
+      outEl.innerHTML = renderPlan(w, drug);
+      outEl.style.display = "block";
+    }
+
+    btn.addEventListener("click", run);
+    [kiloEl, ilacEl].forEach(el => el.addEventListener("keydown", (e) => { if (e.key === "Enter") run(); }));
+  </script>
+</body>
+</html>

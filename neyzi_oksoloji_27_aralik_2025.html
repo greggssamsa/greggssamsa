@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Neyzi (2015) Büyüme Hesaplayıcı – Boy/Kilo/BMI (Tek Dosya)</title>
+<style>
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:18px;}
+.card{border:1px solid #ddd;border-radius:12px;padding:14px;margin-bottom:14px;box-shadow:0 1px 2px rgba(0,0,0,.04);}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+label{display:block;font-size:12px;opacity:.8;margin-bottom:4px;}
+input,select{width:100%;padding:10px;border:1px solid #ccc;border-radius:10px;font-size:14px;}
+button{padding:10px 12px;border:1px solid #222;background:#222;color:#fff;border-radius:10px;font-size:14px;cursor:pointer;}
+button:active{transform:translateY(1px);}
+.out{font-size:14px;line-height:1.55;}
+.muted{opacity:.7;font-size:12px;}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
+hr{border:none;border-top:1px solid #eee;margin:10px 0;}
+.badge{display:inline-block;padding:2px 8px;border:1px solid #ddd;border-radius:999px;font-size:12px;margin-left:6px;}
+.warn{background:#fff3cd;border:1px solid #ffeeba;padding:10px;border-radius:10px;}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h2 style="margin:0 0 8px 0;">Neyzi (2015) – Boy / Kilo / BMI Persentil (Tek Dosya)</h2>
+  <div class="muted">
+    Kaynak: Neyzi ve ark. <span class="mono">J Clin Res Pediatr Endocrinol 2015;7(4):280-293</span>, DOI <span class="mono">10.4274/jcrpe.2183</span>.
+    Boy & kilo için LMS (Tablo 5–6), BMI için persentil tablosu (Tablo 3). Ara yaşlarda interpolasyon uygulanır.
+  </div>
+</div>
+
+<div class="card">
+  <div class="grid">
+    <div>
+      <label>Cinsiyet</label>
+      <select id="sex">
+        <option value="boys">Erkek</option>
+        <option value="girls">Kız</option>
+      </select>
+    </div>
+    <div>
+      <label>Hedef persentil (0.01–99.99) – “Bu yaşta kaç olur?”</label>
+      <input id="targetP" type="number" min="0.01" max="99.99" step="0.01" value="50.00"/>
+    </div>
+  </div>
+
+  <div class="grid" style="margin-top:12px;">
+    <div>
+      <label>Doğum tarihi (GG.AA.YYYY)</label>
+      <input id="dob" placeholder="01.01.2020"/>
+    </div>
+    <div>
+      <label>Muayene tarihi (GG.AA.YYYY)</label>
+      <input id="visit" placeholder="22.12.2025"/>
+    </div>
+  </div>
+
+  <div class="grid" style="margin-top:12px;">
+    <div>
+      <label>Kilo (kg)</label>
+      <input id="weight" placeholder="16,7"/>
+    </div>
+    <div>
+      <label>Boy (cm)</label>
+      <input id="height" placeholder="109,6"/>
+    </div>
+  </div>
+
+  <div style="margin-top:12px;">
+    <button id="calcBtn">Hesapla</button>
+  </div>
+</div>
+
+<div class="card">
+  <div id="output" class="out">Çıktılar burada görünecek.</div>
+</div>
+
+<div class="card warn">
+  <b>Bilmen gereken 2 şey:</b><br/>
+  1) “Rölatif tartı” burada <b>Height-age (varsayımsal yaş)</b> ile hesaplanır: <b>kilo / (boyun 50p olduğu yaşın 50p kilosu)</b>.<br/>
+  2) BMI için burada <b>Tablo 3</b> (5–95p) kullanılıyor. 0.01–99.99p istenince 5p altı / 95p üstü değerler <b>yaklaşık ekstrapolasyon</b> ile tahmin edilir.
+</div>
+
+<script>
+const DATA = {"meta": {"source": "Neyzi et al. J Clin Res Pediatr Endocrinol 2015;7(4):280-293. DOI:10.4274/jcrpe.2183", "note": "LMS points extracted from Tables 5 (weight) and 6 (height). Intermediate ages: linear interpolation over ageMonths."}, "boys": {"weightLMS": [{"ageMonths": 0.0, "L": 1.09, "M": 3.4, "S": 0.131, "label": "Birth"}, {"ageMonths": 1.0, "L": 1.0, "M": 4.4, "S": 0.154, "label": "1 month"}, {"ageMonths": 2.0, "L": 0.9, "M": 5.5, "S": 0.145, "label": "2 months"}, {"ageMonths": 3.0, "L": 0.8, "M": 6.4, "S": 0.14, "label": "3 months"}, {"ageMonths": 6.0, "L": 0.54, "M": 8.1, "S": 0.132, "label": "6 months"}, {"ageMonths": 9.0, "L": 0.35, "M": 9.3, "S": 0.124, "label": "9 months"}, {"ageMonths": 12.0, "L": 0.19, "M": 10.2, "S": 0.127, "label": "12 months"}, {"ageMonths": 15.0, "L": 0.06, "M": 10.9, "S": 0.124, "label": "15 months"}, {"ageMonths": 18.0, "L": -0.05, "M": 11.5, "S": 0.123, "label": "18 months"}, {"ageMonths": 21.0, "L": -0.16, "M": 12.1, "S": 0.122, "label": "21 months"}, {"ageMonths": 24.0, "L": -0.26, "M": 12.7, "S": 0.122, "label": "24 months"}, {"ageMonths": 27.0, "L": -0.37, "M": 13.3, "S": 0.124, "label": "27 months"}, {"ageMonths": 30.0, "L": -0.47, "M": 13.8, "S": 0.124, "label": "30 months"}, {"ageMonths": 33.0, "L": -0.56, "M": 14.3, "S": 0.126, "label": "33 months"}, {"ageMonths": 36.0, "L": -0.66, "M": 14.8, "S": 0.131, "label": "3 years"}, {"ageMonths": 42.0, "L": -0.47, "M": 15.9, "S": 0.131, "label": "3.5 years"}, {"ageMonths": 48.0, "L": -0.51, "M": 16.8, "S": 0.133, "label": "4 years"}, {"ageMonths": 54.0, "L": -0.55, "M": 17.7, "S": 0.135, "label": "4.5 years"}, {"ageMonths": 60.0, "L": -0.59, "M": 18.6, "S": 0.137, "label": "5 years"}, {"ageMonths": 66.0, "L": -0.63, "M": 19.6, "S": 0.139, "label": "5.5 years"}, {"ageMonths": 72.0, "L": -0.67, "M": 20.7, "S": 0.141, "label": "6 years"}, {"ageMonths": 84.0, "L": -0.74, "M": 23.2, "S": 0.147, "label": "7 years"}, {"ageMonths": 96.0, "L": -0.78, "M": 23.9, "S": 0.155, "label": "8 years"}, {"ageMonths": 108.0, "L": -0.78, "M": 28.8, "S": 0.167, "label": "9 years"}, {"ageMonths": 120.0, "L": -0.69, "M": 32.2, "S": 0.183, "label": "10 years"}, {"ageMonths": 132.0, "L": -0.46, "M": 37.8, "S": 0.204, "label": "11 years"}, {"ageMonths": 144.0, "L": -0.13, "M": 44.3, "S": 0.215, "label": "12 years"}, {"ageMonths": 156.0, "L": 0.08, "M": 49.8, "S": 0.209, "label": "13 years"}, {"ageMonths": 168.0, "L": 0.06, "M": 56.2, "S": 0.191, "label": "14 years"}, {"ageMonths": 180.0, "L": -0.09, "M": 62.1, "S": 0.17, "label": "15 years"}, {"ageMonths": 192.0, "L": -0.23, "M": 66.2, "S": 0.155, "label": "16 years"}, {"ageMonths": 204.0, "L": -0.34, "M": 69.2, "S": 0.146, "label": "17 years"}, {"ageMonths": 216.0, "L": -0.43, "M": 71.8, "S": 0.139, "label": "18 years"}], "heightLMS": [{"ageMonths": 0.0, "L": 1.0, "M": 50.0, "S": 0.044, "label": "Birth"}, {"ageMonths": 1.0, "L": 1.0, "M": 54.0, "S": 0.05, "label": "1 month"}, {"ageMonths": 2.0, "L": 1.0, "M": 57.9, "S": 0.048, "label": "2 months"}, {"ageMonths": 3.0, "L": 1.0, "M": 61.3, "S": 0.044, "label": "3 months"}, {"ageMonths": 6.0, "L": 1.0, "M": 68.0, "S": 0.041, "label": "6 months"}, {"ageMonths": 9.0, "L": 1.0, "M": 72.8, "S": 0.039, "label": "9 months"}, {"ageMonths": 12.0, "L": 1.0, "M": 76.9, "S": 0.042, "label": "12 months"}, {"ageMonths": 15.0, "L": 1.0, "M": 80.2, "S": 0.042, "label": "15 months"}, {"ageMonths": 18.0, "L": 1.0, "M": 83.1, "S": 0.043, "label": "18 months"}, {"ageMonths": 21.0, "L": 1.0, "M": 85.7, "S": 0.044, "label": "21 months"}, {"ageMonths": 24.0, "L": 1.0, "M": 88.2, "S": 0.044, "label": "24 months"}, {"ageMonths": 27.0, "L": 1.0, "M": 90.5, "S": 0.043, "label": "27 months"}, {"ageMonths": 30.0, "L": 1.0, "M": 92.6, "S": 0.042, "label": "30 months"}, {"ageMonths": 33.0, "L": 1.0, "M": 94.8, "S": 0.041, "label": "33 months"}, {"ageMonths": 36.0, "L": 1.0, "M": 96.8, "S": 0.041, "label": "3 years"}, {"ageMonths": 42.0, "L": 1.0, "M": 100.5, "S": 0.041, "label": "3.5 years"}, {"ageMonths": 48.0, "L": 1.0, "M": 104.0, "S": 0.041, "label": "4 years"}, {"ageMonths": 54.0, "L": 1.0, "M": 107.3, "S": 0.041, "label": "4.5 years"}, {"ageMonths": 60.0, "L": 1.0, "M": 110.4, "S": 0.041, "label": "5 years"}, {"ageMonths": 66.0, "L": 1.0, "M": 113.3, "S": 0.041, "label": "5.5 years"}, {"ageMonths": 72.0, "L": 1.0, "M": 116.1, "S": 0.041, "label": "6 years"}, {"ageMonths": 84.0, "L": 1.0, "M": 121.5, "S": 0.041, "label": "7 years"}, {"ageMonths": 96.0, "L": 1.0, "M": 126.9, "S": 0.042, "label": "8 years"}, {"ageMonths": 108.0, "L": 1.0, "M": 132.1, "S": 0.042, "label": "9 years"}, {"ageMonths": 120.0, "L": 1.0, "M": 137.6, "S": 0.043, "label": "10 years"}, {"ageMonths": 132.0, "L": 1.0, "M": 143.8, "S": 0.045, "label": "11 years"}, {"ageMonths": 144.0, "L": 1.0, "M": 150.6, "S": 0.048, "label": "12 years"}, {"ageMonths": 156.0, "L": 1.0, "M": 157.7, "S": 0.05, "label": "13 years"}, {"ageMonths": 168.0, "L": 1.0, "M": 164.9, "S": 0.047, "label": "14 years"}, {"ageMonths": 180.0, "L": 1.0, "M": 170.3, "S": 0.042, "label": "15 years"}, {"ageMonths": 192.0, "L": 1.0, "M": 173.4, "S": 0.038, "label": "16 years"}, {"ageMonths": 204.0, "L": 1.0, "M": 175.0, "S": 0.037, "label": "17 years"}, {"ageMonths": 216.0, "L": 1.0, "M": 176.2, "S": 0.035, "label": "18 years"}], "bmiPct": [{"ageMonths": 0.0, "label": "Birth", "p": [5, 15, 25, 50, 75, 85, 95], "v": [11.4, 12.2, 12.7, 13.7, 14.6, 15.2, 16.1]}, {"ageMonths": 3.0, "label": "3 months", "p": [5, 15, 25, 50, 75, 85, 95], "v": [14.4, 15.3, 15.8, 16.9, 18.0, 18.6, 19.7]}, {"ageMonths": 6.0, "label": "6 months", "p": [5, 15, 25, 50, 75, 85, 95], "v": [15.0, 15.9, 16.5, 17.5, 18.6, 19.2, 20.3]}, {"ageMonths": 9.0, "label": "9 months", "p": [5, 15, 25, 50, 75, 85, 95], "v": [15.1, 16.0, 16.5, 17.5, 18.6, 19.3, 20.4]}, {"ageMonths": 12.0, "label": "12 months", "p": [5, 15, 25, 50, 75, 85, 95], "v": [14.9, 15.7, 16.2, 17.2, 18.3, 18.9, 20.0]}, {"ageMonths": 15.0, "label": "15 months", "p": [5, 15, 25, 50, 75, 85, 95], "v": [14.7, 15.5, 16.0, 17.0, 18.0, 18.6, 19.7]}, {"ageMonths": 18.0, "label": "18 months", "p": [5, 15, 25, 50, 75, 85, 95], "v": [14.5, 15.3, 15.7, 16.7, 17.7, 18.3, 19.3]}, {"ageMonths": 24.0, "label": "2 years", "p": [5, 15, 25, 50, 75, 85, 95], "v": [14.3, 15.0, 15.4, 16.3, 17.3, 17.9, 19.0]}, {"ageMonths": 30.0, "label": "2.5 years", "p": [5, 15, 25, 50, 75, 85, 95], "v": [14.2, 14.8, 15.3, 16.2, 17.2, 17.7, 18.8]}, {"ageMonths": 36.0, "label": "3 years", "p": [5, 15, 25, 50, 75, 85, 95], "v": [13.9, 14.6, 15.0, 15.9, 17.0, 17.6, 18.7]}]}, "girls": {"weightLMS": [{"ageMonths": 0.0, "L": 1.0, "M": 3.2, "S": 0.136, "label": "Birth"}, {"ageMonths": 1.0, "L": 1.0, "M": 4.2, "S": 0.167, "label": "1 month"}, {"ageMonths": 2.0, "L": 1.0, "M": 5.1, "S": 0.159, "label": "2 months"}, {"ageMonths": 3.0, "L": 0.9, "M": 5.9, "S": 0.146, "label": "3 months"}, {"ageMonths": 6.0, "L": 0.65, "M": 7.5, "S": 0.133, "label": "6 months"}, {"ageMonths": 9.0, "L": 0.45, "M": 8.6, "S": 0.127, "label": "9 months"}, {"ageMonths": 12.0, "L": 0.29, "M": 9.5, "S": 0.128, "label": "12 months"}, {"ageMonths": 15.0, "L": 0.15, "M": 10.2, "S": 0.126, "label": "15 months"}, {"ageMonths": 18.0, "L": 0.02, "M": 10.8, "S": 0.125, "label": "18 months"}, {"ageMonths": 21.0, "L": -0.1, "M": 11.3, "S": 0.125, "label": "21 months"}, {"ageMonths": 24.0, "L": -0.22, "M": 11.9, "S": 0.125, "label": "24 months"}, {"ageMonths": 27.0, "L": -0.33, "M": 12.4, "S": 0.127, "label": "27 months"}, {"ageMonths": 30.0, "L": -0.45, "M": 12.9, "S": 0.127, "label": "30 months"}, {"ageMonths": 33.0, "L": -0.56, "M": 13.4, "S": 0.129, "label": "33 months"}, {"ageMonths": 36.0, "L": -0.68, "M": 13.9, "S": 0.134, "label": "3 years"}, {"ageMonths": 42.0, "L": -0.49, "M": 15.0, "S": 0.134, "label": "3.5 years"}, {"ageMonths": 48.0, "L": -0.53, "M": 15.9, "S": 0.136, "label": "4 years"}, {"ageMonths": 54.0, "L": -0.57, "M": 16.7, "S": 0.138, "label": "4.5 years"}, {"ageMonths": 60.0, "L": -0.61, "M": 17.6, "S": 0.14, "label": "5 years"}, {"ageMonths": 66.0, "L": -0.65, "M": 18.6, "S": 0.142, "label": "5.5 years"}, {"ageMonths": 72.0, "L": -0.69, "M": 19.7, "S": 0.144, "label": "6 years"}], "heightLMS": [{"ageMonths": 0.0, "L": 1.0, "M": 49.1, "S": 0.045, "label": "Birth"}, {"ageMonths": 1.0, "L": 1.0, "M": 53.0, "S": 0.05, "label": "1 month"}, {"ageMonths": 2.0, "L": 1.0, "M": 56.6, "S": 0.047, "label": "2 months"}, {"ageMonths": 3.0, "L": 1.0, "M": 59.8, "S": 0.044, "label": "3 months"}, {"ageMonths": 6.0, "L": 1.0, "M": 66.2, "S": 0.04, "label": "6 months"}, {"ageMonths": 9.0, "L": 1.0, "M": 70.8, "S": 0.039, "label": "9 months"}, {"ageMonths": 12.0, "L": 1.0, "M": 74.7, "S": 0.042, "label": "12 months"}, {"ageMonths": 15.0, "L": 1.0, "M": 78.2, "S": 0.039, "label": "15 months"}, {"ageMonths": 18.0, "L": 1.0, "M": 81.5, "S": 0.04, "label": "18 months"}, {"ageMonths": 21.0, "L": 1.0, "M": 84.3, "S": 0.04, "label": "21 months"}, {"ageMonths": 24.0, "L": 1.0, "M": 86.8, "S": 0.041, "label": "24 months"}, {"ageMonths": 27.0, "L": 1.0, "M": 89.1, "S": 0.041, "label": "27 months"}, {"ageMonths": 30.0, "L": 1.0, "M": 91.2, "S": 0.042, "label": "30 months"}, {"ageMonths": 33.0, "L": 1.0, "M": 93.4, "S": 0.042, "label": "33 months"}, {"ageMonths": 36.0, "L": 1.0, "M": 95.4, "S": 0.042, "label": "3 years"}, {"ageMonths": 42.0, "L": 1.0, "M": 99.0, "S": 0.043, "label": "3.5 years"}, {"ageMonths": 48.0, "L": 1.0, "M": 102.5, "S": 0.043, "label": "4 years"}, {"ageMonths": 54.0, "L": 1.0, "M": 105.9, "S": 0.042, "label": "4.5 years"}, {"ageMonths": 60.0, "L": 1.0, "M": 109.1, "S": 0.042, "label": "5 years"}, {"ageMonths": 66.0, "L": 1.0, "M": 112.1, "S": 0.042, "label": "5.5 years"}, {"ageMonths": 72.0, "L": 1.0, "M": 115.1, "S": 0.041, "label": "6 years"}], "bmiPct": [{"ageMonths": 0.0, "label": "Birth", "p": [5, 15, 25, 50, 75, 85, 95], "v": [11.4, 12.2, 12.6, 13.5, 14.4, 14.9, 15.8]}, {"ageMonths": 3.0, "label": "3 months", "p": [5, 15, 25, 50, 75, 85, 95], "v": [13.9, 14.8, 15.3, 16.3, 17.3, 17.9, 18.9]}, {"ageMonths": 6.0, "label": "6 months", "p": [5, 15, 25, 50, 75, 85, 95], "v": [14.7, 15.4, 15.9, 16.9, 18.0, 18.6, 19.7]}, {"ageMonths": 9.0, "label": "9 months", "p": [5, 15, 25, 50, 75, 85, 95], "v": [14.8, 15.5, 16.0, 17.0, 18.0, 18.6, 19.8]}, {"ageMonths": 12.0, "label": "12 months", "p": [5, 15, 25, 50, 75, 85, 95], "v": [14.6, 15.3, 15.7, 16.6, 17.7, 18.2, 19.4]}]}};
+// ---------- parsing ----------
+function parseTRNumber(s){ if(s==null) return null; s=String(s).trim(); if(!s) return null; s=s.replace(/,/g,'.'); const v=Number(s); return Number.isFinite(v)?v:null; }
+function parseDateGGAAyyyy(s){
+  if(!s) return null; s=String(s).trim();
+  const m=s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/); if(!m) return null;
+  const dd=Number(m[1]), mm=Number(m[2]), yy=Number(m[3]);
+  const dt=new Date(Date.UTC(yy,mm-1,dd));
+  if(dt.getUTCFullYear()!==yy || (dt.getUTCMonth()+1)!==mm || dt.getUTCDate()!==dd) return null;
+  return dt;
+}
+function ageInMonths(dob,visit){ const msDay=86400000; const days=(visit.getTime()-dob.getTime())/msDay; return days/30.4375; }
+
+// ---------- normal dist ----------
+function normCdf(z){
+  const t=1/(1+0.2316419*Math.abs(z));
+  const d=0.3989423*Math.exp(-z*z/2);
+  let p=d*t*(0.3193815 + t*(-0.3565638 + t*(1.781478 + t*(-1.821256 + t*1.330274))));
+  if(z>0) p=1-p;
+  return p;
+}
+function normInv(p){
+  if(p<=0) return -Infinity; if(p>=1) return Infinity;
+  const a=[-39.69683028665376,220.9460984245205,-275.9285104469687,138.357751867269, -30.66479806614716, 2.506628277459239];
+  const b=[-54.47609879822406,161.5858368580409,-155.6989798598866,66.80131188771972,-13.28068155288572];
+  const c=[-0.007784894002430293,-0.3223964580411365,-2.400758277161838,-2.549732539343734,4.374664141464968,2.938163982698783];
+  const d=[0.007784695709041462,0.3224671290700398,2.445134137142996,3.754408661907416];
+  const plow=0.02425, phigh=1-plow;
+  let q,r;
+  if(p<plow){ q=Math.sqrt(-2*Math.log(p));
+    return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
+  }
+  if(phigh<p){ q=Math.sqrt(-2*Math.log(1-p));
+    return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
+  }
+  q=p-0.5; r=q*q;
+  return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q / (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);
+}
+
+// ---------- LMS ----------
+function interpLMS(series, ageMonths){
+  if(!series||!series.length) return null;
+  if(ageMonths<=series[0].ageMonths) return series[0];
+  if(ageMonths>=series[series.length-1].ageMonths) return series[series.length-1];
+  let lo=0, hi=series.length-1;
+  while(hi-lo>1){
+    const mid=(lo+hi)>>1;
+    if(series[mid].ageMonths<=ageMonths) lo=mid; else hi=mid;
+  }
+  const a=series[lo], b=series[hi];
+  const t=(ageMonths-a.ageMonths)/(b.ageMonths-a.ageMonths);
+  return {ageMonths, L:a.L+(b.L-a.L)*t, M:a.M+(b.M-a.M)*t, S:a.S+(b.S-a.S)*t};
+}
+function zFromLMS(x,L,M,S){
+  if(x<=0||M<=0||S<=0) return null;
+  if(Math.abs(L)<1e-9) return Math.log(x/M)/S;
+  return (Math.pow(x/M,L)-1)/(L*S);
+}
+function valueFromPercentile(p,L,M,S){
+  const z=normInv(p/100);
+  if(!Number.isFinite(z)||M<=0||S<=0) return null;
+  if(Math.abs(L)<1e-9) return M*Math.exp(S*z);
+  const inner=1+L*S*z; if(inner<=0) return null;
+  return M*Math.pow(inner,1/L);
+}
+
+// ---------- BSA ----------
+function bsaMosteller(weightKg, heightCm){
+  if(weightKg==null||heightCm==null) return null;
+  if(weightKg<=0||heightCm<=0) return null;
+  return Math.sqrt((heightCm*weightKg)/3600.0);
+}
+function bsaAlt(weightKg){
+  if(weightKg==null||weightKg<=0) return null;
+  return (4*weightKg + 7) / (weightKg + 90);
+}
+
+// ---------- Helpers ----------
+function fmt(n,d=2){ if(n==null||!Number.isFinite(n)) return "—"; return n.toFixed(d); }
+function clamp(n,a,b){ return Math.max(a, Math.min(b,n)); }
+
+function classifyRelativeWeight(rt){
+  if(rt == null || !isFinite(rt)) return "—";
+  if(rt < 70) return "Ağır akut malnütrisyon";
+  if(rt < 80) return "Orta akut malnütrisyon";
+  if(rt < 90) return "Hafif akut malnütrisyon";
+  if(rt <= 110) return "Normal";
+  if(rt <= 120) return "Gürbüz / Kilolu";
+  if(rt <= 140) return "Obez";
+  return "Morbid obez";
+}
+function classifyHeightForAge(hfa){
+  if(hfa == null || !isFinite(hfa)) return "—";
+  if(hfa < 85) return "Ağır kronik malnütrisyon";
+  if(hfa < 90) return "Orta kronik malnütrisyon";
+  if(hfa < 95) return "Hafif kronik malnütrisyon";
+  if(hfa <= 105) return "Normal";
+  return "Normal / Uzun";
+}
+
+function findAgeForMedianHeight(heightSeries, targetCm){
+  if(targetCm == null || !isFinite(targetCm)) return null;
+  const minA = heightSeries[0].ageMonths;
+  const maxA = heightSeries[heightSeries.length-1].ageMonths;
+  const minM = interpLMS(heightSeries, minA).M;
+  const maxM = interpLMS(heightSeries, maxA).M;
+  if(targetCm <= minM) return minA;
+  if(targetCm >= maxM) return maxA;
+  let lo = minA, hi = maxA;
+  for(let i=0;i<60;i++){
+    const mid = (lo+hi)/2;
+    const m = interpLMS(heightSeries, mid).M;
+    if(m < targetCm) lo = mid;
+    else hi = mid;
+  }
+  return (lo+hi)/2;
+}
+function fmtAgeMonths(ageM){
+  if(ageM == null || !isFinite(ageM)) return "—";
+  const y = ageM/12;
+  return fmt(ageM,1) + " ay (" + fmt(y,2) + " yıl)";
+}
+
+document.getElementById("calcBtn").addEventListener("click", ()=>{
+  const sex=document.getElementById("sex").value;
+  const dob=parseDateGGAAyyyy(document.getElementById("dob").value);
+  const visit=parseDateGGAAyyyy(document.getElementById("visit").value);
+  const w=parseTRNumber(document.getElementById("weight").value);
+  const h=parseTRNumber(document.getElementById("height").value);
+  const targetP=clamp(parseTRNumber(document.getElementById("targetP").value) ?? 50, 0.01, 99.99);
+  const out=document.getElementById("output");
+
+  if(!dob || !visit){ out.innerHTML="<b>Hata:</b> Tarih formatı GG.AA.YYYY olmalı."; return; }
+  const ageM=ageInMonths(dob,visit);
+  if(!Number.isFinite(ageM) || ageM<0){ out.innerHTML="<b>Hata:</b> Muayene tarihi doğumdan sonra olmalı."; return; }
+
+  const lmsW=interpLMS(DATA[sex].weightLMS, ageM);
+  const lmsH=interpLMS(DATA[sex].heightLMS, ageM);
+
+  const zW = (w!=null)? zFromLMS(w, lmsW.L, lmsW.M, lmsW.S) : null;
+  const zH = (h!=null)? zFromLMS(h, lmsH.L, lmsH.M, lmsH.S) : null;
+
+  const pW = (zW!=null)? normCdf(zW)*100 : null;
+  const pH = (zH!=null)? normCdf(zH)*100 : null;
+
+  const expW50 = lmsW.M;
+  const expH50 = lmsH.M;
+
+  // yaşa göre boy %  (boy / 50p boy)*100
+  const heightForAgePct = (h!=null && expH50>0) ? (h/expH50*100) : null;
+
+  // Varsayımsal yaş (height-age): gerçek boyun 50p (median) olduğu yaş
+  const ageHypM = (h!=null) ? findAgeForMedianHeight(DATA[sex].heightLMS, h) : null;
+  const lmsW_hyp = (ageHypM!=null) ? interpLMS(DATA[sex].weightLMS, ageHypM) : null;
+  const w50_hyp = (lmsW_hyp!=null) ? lmsW_hyp.M : null;
+
+  // Rölatif tartı % = gerçek kilo / varsayımsal yaşın 50p kilosu
+  const rt = (w!=null && w50_hyp!=null && w50_hyp>0) ? (w/w50_hyp*100) : null;
+
+  // BMI (sadece değer; persentil/SDS yok)
+  const bmi = (w!=null && h!=null && h>0) ? (w / Math.pow(h/100.0,2)) : null;
+
+  // target percentile values for age (weight & height)
+  const refW = valueFromPercentile(targetP, lmsW.L, lmsW.M, lmsW.S);
+  const refH = valueFromPercentile(targetP, lmsH.L, lmsH.M, lmsH.S);
+
+  // BSA
+  const bsa1 = bsaMosteller(w,h);
+  const bsa2 = bsaAlt(w);
+
+  const ageY=ageM/12;
+
+  out.innerHTML =
+    "<div><b>Yaş:</b> "+fmt(ageM,1)+" ay ("+fmt(ageY,2)+" yıl)</div>"+
+    "<hr>"+
+    "<div><b>Boy (cm):</b> "+(h==null?"—":fmt(h,2)) + (pH==null?"":" → <b>"+fmt(pH,2)+"p</b> (Z="+fmt(zH,2)+")") + "</div>"+
+    "<div class='muted'><b>Yaşa göre boy:</b> <b>%"+fmt(heightForAgePct,1)+"</b> → <b>"+classifyHeightForAge(heightForAgePct)+"</b> | 50p boy: <b>"+fmt(expH50,2)+" cm</b></div>"+
+    "<hr>"+
+    "<div><b>Kilo (kg):</b> "+(w==null?"—":fmt(w,2)) + (pW==null?"":" → <b>"+fmt(pW,2)+"p</b> (Z="+fmt(zW,2)+")") + "</div>"+
+    "<div class='muted'>Varsayımsal yaş (boyun 50p olduğu yaş): <b>" + fmtAgeMonths(ageHypM) + "</b></div>"+
+    "<div class='muted'><b>Rölatif tartı:</b> <b>%"+fmt(rt,1)+"</b> → <b>"+classifyRelativeWeight(rt)+"</b> (varsayımsal yaş 50p kilo: "+fmt(w50_hyp,2)+" kg)</div>"+
+    "<hr>"+
+    "<div><b>BMI (kg/m²):</b> "+(bmi==null?"—":fmt(bmi,2)) + "</div>"+
+    "<hr>"+
+    "<div><b>VYA / BSA:</b> "+
+      "Mosteller: <b>"+fmt(bsa1,3)+" m²</b> | (4*kg+7)/(kg+90): <b>"+fmt(bsa2,3)+" m²</b></div>"+
+    "<hr>"+
+    "<div class='muted'>Hedef "+fmt(targetP,2)+"p → beklenen kilo: <b>"+fmt(refW,2)+" kg</b> | beklenen boy: <b>"+fmt(refH,2)+" cm</b></div>";
+});
+</script>
+</body>
+</html>

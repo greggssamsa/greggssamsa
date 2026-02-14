@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>IV Sıvı Hesaplama</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #f6f7fb; }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 16px; }
+    .card { background: #fff; border-radius: 14px; padding: 16px; box-shadow: 0 6px 20px rgba(0,0,0,.06); }
+    h1 { font-size: 20px; margin: 0 0 12px; }
+    label { display:block; font-weight: 600; margin: 10px 0 6px; }
+    input, select, button { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #d9dce5; font-size: 16px; }
+    button { border: 0; background: #1f6feb; color: #fff; font-weight: 700; cursor: pointer; margin-top: 12px; }
+    button:active { transform: translateY(1px); }
+    .row { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    @media (min-width: 640px) { .row { grid-template-columns: 1fr 1fr; } }
+    .muted { color: #667085; font-size: 13px; margin-top: 6px; }
+    .out { margin-top: 14px; padding: 12px; background: #f2f6ff; border: 1px solid #d7e3ff; border-radius: 12px; }
+    .out b { display:inline-block; min-width: 140px; }
+    .error { margin-top: 12px; padding: 10px; background: #fff1f1; border: 1px solid #ffd1d1; border-radius: 12px; color: #b42318; }
+    .hide { display: none; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>IV Sıvı Hesaplama</h1>
+
+      <div class="row">
+        <div>
+          <label for="weight">Hastanın kilosu (kg)</label>
+          <input id="weight" inputmode="decimal" placeholder="Örn: 14.2" />
+          <div class="muted">Virgül veya nokta kullanabilirsin.</div>
+        </div>
+
+        <div>
+          <label for="choice" id="choiceLabel">Seçenek</label>
+          <select id="choice" disabled></select>
+          <div class="muted" id="choiceHint">Önce kilo gir.</div>
+        </div>
+      </div>
+
+      <button id="calcBtn" type="button">Hesapla</button>
+
+      <div id="err" class="error hide"></div>
+
+      <div id="out" class="out hide">
+        <div id="bsaRow" class="hide"><b>BSA (VYA):</b> <span id="bsaVal"></span> m²</div>
+        <div><b>Günlük sıvı:</b> <span id="dailyVal"></span> mL</div>
+        <div><b>Saatlik hız:</b> <span id="hourlyVal"></span> mL/saat</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Python'daki: ((kg*4)+7) / (90+kg)
+    function calculateBsa(weightKg) {
+      return ((weightKg * 4) + 7) / (90 + weightKg);
+    }
+
+    const weightEl = document.getElementById("weight");
+    const choiceEl = document.getElementById("choice");
+    const choiceLabelEl = document.getElementById("choiceLabel");
+    const choiceHintEl = document.getElementById("choiceHint");
+    const btnEl = document.getElementById("calcBtn");
+
+    const errEl = document.getElementById("err");
+    const outEl = document.getElementById("out");
+    const bsaRowEl = document.getElementById("bsaRow");
+    const bsaValEl = document.getElementById("bsaVal");
+    const dailyValEl = document.getElementById("dailyVal");
+    const hourlyValEl = document.getElementById("hourlyVal");
+
+    let lastMode = null; // "kg" veya "m2"
+
+    function showError(msg) {
+      errEl.textContent = msg;
+      errEl.classList.remove("hide");
+    }
+    function clearError() {
+      errEl.textContent = "";
+      errEl.classList.add("hide");
+    }
+
+    function parseWeight() {
+      const raw = (weightEl.value || "").trim().replace(",", ".");
+      const w = Number(raw);
+      if (!Number.isFinite(w) || w <= 0) return null;
+      return w;
+    }
+
+    function fillSelect(options, unitLabel) {
+      // mevcut seçimi korumaya çalış
+      const prev = choiceEl.value;
+
+      choiceEl.innerHTML = "";
+      options.forEach(v => {
+        const opt = document.createElement("option");
+        opt.value = String(v);
+        opt.textContent = `${v} ${unitLabel}`;
+        choiceEl.appendChild(opt);
+      });
+
+      // varsa önceki değer hala listede ise geri yükle
+      if (prev && options.map(String).includes(prev)) {
+        choiceEl.value = prev;
+      }
+
+      choiceEl.disabled = false;
+    }
+
+    function updateOptionsByWeight(w) {
+      const mode = (w < 12.5) ? "kg" : "m2";
+      if (mode === lastMode) return; // mode değişmediyse select'i resetleme
+
+      lastMode = mode;
+
+      if (mode === "kg") {
+        const options = [40, 60, 80, 100, 120]; // mL/kg/gün
+        choiceLabelEl.textContent = "Seçenek (mL/kg/gün)";
+        choiceHintEl.textContent = "Kilo < 12.5 kg ise mL/kg/gün seç.";
+        fillSelect(options, "mL/kg/gün");
+      } else {
+        const options = [750, 1000, 1250, 1500, 2000, 2500, 3000]; // mL/m²/gün
+        choiceLabelEl.textContent = "Seçenek (mL/m²/gün)";
+        choiceHintEl.textContent = "Kilo ≥ 12.5 kg ise mL/m²/gün seç.";
+        fillSelect(options, "mL/m²/gün");
+      }
+    }
+
+    function compute() {
+      clearError();
+      outEl.classList.add("hide");
+
+      const w = parseWeight();
+      if (w === null) {
+        showError("Geçerli bir kilo gir (örn: 14.2).");
+        return;
+      }
+
+      // seçenekleri burada resetlemiyoruz; sadece gerekirse (mode değişmişse) güncelliyoruz
+      updateOptionsByWeight(w);
+
+      const choice = Number(choiceEl.value);
+      if (!Number.isFinite(choice)) {
+        showError("Geçerli bir seçenek seç.");
+        return;
+      }
+
+      let dailyMl = 0;
+
+      if (w < 12.5) {
+        dailyMl = w * choice;
+        bsaRowEl.classList.add("hide");
+      } else {
+        const bsa = calculateBsa(w);
+        dailyMl = bsa * choice;
+        bsaValEl.textContent = bsa.toFixed(3);
+        bsaRowEl.classList.remove("hide");
+      }
+
+      const hourly = dailyMl / 24;
+
+      dailyValEl.textContent = dailyMl.toFixed(1);
+      hourlyValEl.textContent = hourly.toFixed(1);
+
+      outEl.classList.remove("hide");
+    }
+
+    // Kilo değişince seçenekleri otomatik güncelle (mode değişirse)
+    weightEl.addEventListener("input", () => {
+      clearError();
+      outEl.classList.add("hide");
+
+      const w = parseWeight();
+      if (w === null) {
+        lastMode = null;
+        choiceEl.innerHTML = "";
+        choiceEl.disabled = true;
+        choiceLabelEl.textContent = "Seçenek";
+        choiceHintEl.textContent = "Önce kilo gir.";
+        return;
+      }
+      updateOptionsByWeight(w);
+    });
+
+    btnEl.addEventListener("click", compute);
+
+    // Enter ile hesapla
+    weightEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") compute();
+    });
+  </script>
+</body>
+</html>

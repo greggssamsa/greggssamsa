@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QTc Hesaplama</title>
+
+<style>
+:root {
+  --bg:#020617; --card:#0f172a; --text:#e5e7eb;
+  --accent:#38bdf8; --ok:#22c55e; --warn:#facc15; --danger:#ef4444;
+}
+.light {
+  --bg:#f8fafc; --card:#ffffff; --text:#020617; --accent:#2563eb;
+}
+body {
+  margin:0; background:var(--bg); color:var(--text);
+  font-family:system-ui; display:flex; justify-content:center; padding:16px;
+}
+.card {
+  width:100%; max-width:420px; background:var(--card);
+  padding:16px; border-radius:12px;
+}
+h2 { margin:0 0 12px; }
+label { font-size:13px; margin-top:10px; display:block; }
+input, select, button {
+  width:100%; margin-top:4px; padding:10px;
+  border-radius:8px; border:none; font-size:15px;
+}
+input, select { background:#020617; color:var(--text); }
+.light input, .light select { background:#e5e7eb; color:#020617; }
+button { background:var(--accent); color:white; margin-top:14px; }
+.toggle { background:none; border:1px solid var(--accent); color:var(--text); }
+.result { margin-top:14px; padding:12px; border-radius:8px; background:#020617; }
+.light .result { background:#e5e7eb; }
+.ok{color:var(--ok);} .warn{color:var(--warn);} .danger{color:var(--danger);}
+.note { font-size:12px; opacity:.8; margin-top:8px; }
+</style>
+</head>
+
+<body>
+<div class="card">
+<button class="toggle" onclick="toggleTheme()">🌙 / ☀️ Tema</button>
+<h2>QTc Hesaplama</h2>
+
+<label>Formül</label>
+<select id="formula">
+  <option value="bazett">Bazett (Büyük Çocuk)</option>
+  <option value="fridericia">Fridericia (Bebek)</option>
+</select>
+
+<label>Cinsiyet</label>
+<select id="sex">
+  <option value="male">Erkek</option>
+  <option value="female">Kadın</option>
+</select>
+
+<label>QT</label>
+<input id="qtVal" type="number" placeholder="QT">
+<select id="qtUnit">
+  <option value="ms">ms</option>
+  <option value="box">küçük kare</option>
+</select>
+
+<label>Heart Rate (opsiyonel)</label>
+<input id="hrVal" type="number" placeholder="bpm">
+
+<label>RR (opsiyonel)</label>
+<input id="rrVal" type="number" placeholder="RR">
+<select id="rrUnit">
+  <option value="ms">ms</option>
+  <option value="box">küçük kare</option>
+</select>
+
+<button onclick="calculateQTc()">QTc Hesapla</button>
+
+<div class="result" id="output">QTc: —</div>
+
+<div class="note">
+• 1 küçük kare = 40 ms (25 mm/sn)<br>
+• HR veya RR’den biri yeterlidir
+</div>
+</div>
+
+<script>
+const SMALL_BOX = 40;
+
+function toggleTheme(){
+  document.body.classList.toggle("light");
+}
+
+function calculateQTc(){
+  const qtInput = parseFloat(document.getElementById("qtVal").value);
+  const hrInput = parseFloat(document.getElementById("hrVal").value);
+  const rrInput = parseFloat(document.getElementById("rrVal").value);
+  const qtUnit = document.getElementById("qtUnit").value;
+  const rrUnit = document.getElementById("rrUnit").value;
+  const formula = document.getElementById("formula").value;
+  const sex = document.getElementById("sex").value;
+  const out = document.getElementById("output");
+
+  if (isNaN(qtInput)) {
+    out.innerHTML = "QT girilmelidir";
+    return;
+  }
+
+  let qt = qtInput;
+  if (qtUnit === "box") qt *= SMALL_BOX;
+
+  let rr;
+  if (!isNaN(hrInput)) {
+    rr = 60000 / hrInput;
+  } else if (!isNaN(rrInput)) {
+    rr = rrInput;
+    if (rrUnit === "box") rr *= SMALL_BOX;
+  } else {
+    out.innerHTML = "HR veya RR girilmelidir";
+    return;
+  }
+
+  const rrSec = rr / 1000;
+  let qtc = formula === "bazett"
+    ? qt / Math.sqrt(rrSec)
+    : qt / Math.cbrt(rrSec);
+
+  let cls = "ok";
+  let msg = "Normal";
+
+  if (qtc < 350) {
+    cls = "warn"; msg = "Kısalmış QTc";
+  } else if (qtc >= 500) {
+    cls = "danger"; msg = "Torsade de Pointes riski ↑";
+  } else if (
+    (sex === "male" && qtc > 440) ||
+    (sex === "female" && qtc > 460)
+  ) {
+    cls = "warn"; msg = "Uzamış QTc";
+  }
+
+  out.innerHTML = `<div class="${cls}">QTc: ${qtc.toFixed(1)} ms<br>${msg}</div>`;
+}
+</script>
+</body>
+</html>
